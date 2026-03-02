@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bond Book">
+<meta name="theme-color" content="#0d0d0d">
+<title>Bond Book</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+/* ── Reset & base ──────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d0d0d;
+  --surface: #161616;
+  --border: #242424;
+  --accent: #e8ff47;
+  --red: #ff3b3b;
+  --green: #3bff8a;
+  --text: #f0ede6;
+  --muted: #555;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'DM Mono', monospace;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── Grain overlay ────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.6;
+}
+
+/* ── App shell ────────────────────────────────────── */
+.app {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top, 44px) 0 env(safe-area-inset-bottom, 34px);
+}
+
+/* ── Screens ──────────────────────────────────────── */
+.screen { display: none; flex-direction: column; flex: 1; padding: 24px 20px; animation: fadeUp 0.3s ease; }
+.screen.active { display: flex; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ───────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 52px;
+  line-height: 0.9;
+  letter-spacing: 0.01em;
+}
+
+.logo span { color: var(--accent); }
+
+.time-badge {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* ── Class cards ──────────────────────────────────── */
+.classes-list { display: flex; flex-direction: column; gap: 12px; flex: 1; }
+
+.class-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 12px 16px;
+  align-items: center;
+  transition: border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.class-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.3;
+  transition: opacity 0.2s;
+}
+
+.class-card:has(.book-btn:hover)::before { opacity: 1; }
+
+.class-info {}
+.class-day {
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.class-time {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  letter-spacing: 0.06em;
+}
+.class-duration {
+  font-size: 11px;
+  color: #383838;
+  margin-top: 2px;
+}
+
+.class-status {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  grid-column: 1;
+  color: var(--muted);
+  min-height: 16px;
+}
+.class-status.success { color: var(--green); }
+.class-status.error   { color: var(--red); }
+.class-status.loading { color: var(--accent); animation: pulse 1.2s ease infinite; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.book-btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  grid-row: 1 / 3;
+  grid-column: 2;
+  transition: transform 0.1s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+.book-btn:hover  { opacity: 0.85; }
+.book-btn:active { transform: scale(0.96); }
+.book-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+/* ── Book all button ──────────────────────────────── */
+.book-all-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 18px;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 14px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.book-all-btn:hover { background: var(--accent); color: var(--bg); }
+
+/* ── Bottom nav ───────────────────────────────────── */
+.bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  border-top: 1px solid var(--border);
+  padding: 16px 0 0;
+  margin-top: 24px;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.nav-btn.active { color: var(--accent); }
+.nav-btn:hover  { color: var(--text); background: var(--surface); }
+
+.nav-icon { font-size: 18px; }
+
+/* ── Settings screen ──────────────────────────────── */
+.settings-title {
+  font-family: var(--font-display);
+  font-size: 42px;
+  margin-bottom: 28px;
+}
+
+.field { margin-bottom: 16px; }
+label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+input, select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 13px 14px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+}
+input:focus, select:focus { border-color: var(--accent); }
+input::placeholder { color: #333; }
+
+select option { background: var(--surface); }
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.section-sep {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 24px 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Classes manager ──────────────────────────────── */
+.classes-manager { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+
+.class-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.class-row select, .class-row input {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.remove-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.remove-btn:hover { border-color: var(--red); color: var(--red); }
+
+.add-class-btn {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  transition: border-color 0.15s, color 0.15s;
+}
+.add-class-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.save-btn {
+  width: 100%;
+  margin-top: 24px;
+  padding: 17px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.save-btn:hover { opacity: 0.85; }
+
+.save-msg {
+  text-align: center;
+  font-size: 12px;
+  margin-top: 12px;
+  min-height: 18px;
+  letter-spacing: 0.04em;
+}
+.save-msg.ok  { color: var(--green); }
+.save-msg.err { color: var(--red); }
+
+/* ── PIN prompt overlay ───────────────────────────── */
+.pin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.pin-overlay.active { display: flex; }
+
+.pin-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px;
+  width: 300px;
+  text-align: center;
+}
+
+.pin-title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+.pin-subtitle { font-size: 12px; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
+
+.pin-input {
+  text-align: center;
+  font-size: 24px;
+  letter-spacing: 0.3em;
+  margin-bottom: 16px;
+}
+
+.pin-confirm-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.pin-cancel-btn {
+  width: 100%;
+  padding: 10px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+/* ── Worker URL prompt ────────────────────────────── */
+.setup-banner {
+  background: rgba(232,255,71,0.07);
+  border: 1px solid rgba(232,255,71,0.2);
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--accent);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.setup-banner strong { display: block; margin-bottom: 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── HOME SCREEN ── -->
+  <div class="screen active" id="screen-home">
+    <div class="header">
+      <div class="logo">BOND<br><span>BOOK</span></div>
+      <div class="time-badge" id="live-time">--:--</div>
+    </div>
+
+    <div id="no-config-banner" class="setup-banner" style="display:none">
+      <strong>Setup needed</strong>
+      Go to Settings to enter your credentials and class schedule.
+    </div>
+
+    <div class="classes-list" id="classes-list">
+      <!-- Populated by JS -->
+    </div>
+
+    <button class="book-all-btn" onclick="bookAll()">BOOK ALL DUE NOW</button>
+
+    <div class="bottom-nav">
+      <button class="nav-btn active" onclick="showScreen('home')">
+        <span class="nav-icon">🏋️</span> Classes
+      </button>
+      <button class="nav-btn" onclick="showScreen('settings')">
+        <span class="nav-icon">⚙️</span> Settings
+      </button>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS SCREEN ── -->
+  <div class="screen" id="screen-settings">
+    <div class="settings-title">SETTINGS</div>
+
+    <div class="field">
+      <label>Worker URL</label>
+      <input type="url" id="worker-url" placeholder="https://bond-booker.yourname.workers.dev">
+    </div>
+
+    <p class="section-sep">Credentials</p>
+
+    <div class="field">
+      <label>Bond Athletic Email</label>
+      <input type="email" id="cred-email" placeholder="you@email.com">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="cred-password" placeholder="••••••••">
+    </div>
+    <div class="field">
+      <label>PIN (protects your credentials)</label>
+      <input type="password" id="cred-pin" placeholder="4+ digit PIN" maxlength="12">
+    </div>
+
+    <p class="section-sep">My Classes</p>
+
+    <div class="classes-manager" id="classes-manager"></div>
+    <button class="add-class-btn" onclick="addClassRow()">+ Add class</button>
+
+    <button class="save-btn" onclick="saveConfig()">SAVE CONFIG</button>
+    <div class="save-msg" id="save-msg"></div>
+
+    <div class="bottom-nav">
+      <button class="nav-btn" onclick="showScreen('home')">
+        <span class="nav-icon">🏋️</span> Classes
+      </button>
+      <button class="nav-btn active" onclick="showScreen('settings')">
+        <span class="nav-icon">⚙️</span> Settings
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PIN OVERLAY ── -->
+<div class="pin-overlay" id="pin-overlay">
+  <div class="pin-card">
+    <div class="pin-title">ENTER PIN</div>
+    <p class="pin-subtitle" id="pin-subtitle">Enter your PIN to book this class</p>
+    <input class="pin-input" type="password" id="pin-input" placeholder="••••" maxlength="12" inputmode="numeric">
+    <button class="pin-confirm-btn" onclick="confirmPin()">CONFIRM</button>
+    <button class="pin-cancel-btn" onclick="cancelPin()">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────
+let pendingBookAction = null;
+let config = null; // {classes: [{day, startTime, endTime}]}
+
+const WORKER_URL_KEY = 'bond_worker_url';
+const CLASSES_KEY    = 'bond_classes';
+
+// ── Init ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadStoredData();
+  startClock();
+  renderClasses();
+  registerSW();
+});
+
+function loadStoredData() {
+  const url = localStorage.getItem(WORKER_URL_KEY) || '';
+  const classes = JSON.parse(localStorage.getItem(CLASSES_KEY) || '[]');
+
+  document.getElementById('worker-url').value = url;
+  config = { workerUrl: url, classes };
+
+  // Pre-fill settings class rows
+  if (classes.length > 0) {
+    classes.forEach(cls => addClassRow(cls));
+  } else {
+    addClassRow(); // start with one empty row
+  }
+}
+
+function startClock() {
+  const el = document.getElementById('live-time');
+  const update = () => {
+    const now = new Date();
+    el.textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  };
+  update();
+  setInterval(update, 30000);
+}
+
+// ── Screen nav ───────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll(`.nav-btn[onclick*="${name}"]`).forEach(b => b.classList.add('active'));
+}
+
+// ── Render class cards ───────────────────────────────
+function renderClasses() {
+  const list = document.getElementById('classes-list');
+  const classes = JSON.parse(localStorage.getItem(CLASSES_KEY) || '[]');
+  const banner = document.getElementById('no-config-banner');
+
+  if (classes.length === 0) {
+    list.innerHTML = '';
+    banner.style.display = 'block';
+    return;
+  }
+
+  banner.style.display = 'none';
+
+  list.innerHTML = classes.map((cls, i) => `
+    <div class="class-card" id="card-${i}">
+      <div class="class-info">
+        <div class="class-day">${cls.day.toUpperCase()}</div>
+        <div class="class-time">${cls.startTime} → ${cls.endTime}</div>
+      </div>
+      <button class="book-btn" onclick="triggerBook(${i})">BOOK</button>
+      <div class="class-status" id="status-${i}"></div>
+    </div>
+  `).join('');
+}
+
+// ── Book flow ────────────────────────────────────────
+function triggerBook(classIndex) {
+  const workerUrl = localStorage.getItem(WORKER_URL_KEY);
+  if (!workerUrl) {
+    alert('Please set your Worker URL in Settings first.');
+    return;
+  }
+
+  pendingBookAction = { type: 'single', classIndex };
+  document.getElementById('pin-subtitle').textContent = 'Enter your PIN to book this class';
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-overlay').classList.add('active');
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+
+function bookAll() {
+  const workerUrl = localStorage.getItem(WORKER_URL_KEY);
+  if (!workerUrl) {
+    alert('Please set your Worker URL in Settings first.');
+    return;
+  }
+
+  pendingBookAction = { type: 'all' };
+  document.getElementById('pin-subtitle').textContent = 'Enter your PIN to book all due classes';
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-overlay').classList.add('active');
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+
+async function confirmPin() {
+  const pin = document.getElementById('pin-input').value.trim();
+  if (!pin) return;
+
+  document.getElementById('pin-overlay').classList.remove('active');
+
+  const workerUrl = localStorage.getItem(WORKER_URL_KEY);
+  const action = pendingBookAction;
+  pendingBookAction = null;
+
+  if (action.type === 'single') {
+    await doBook(workerUrl, pin, action.classIndex);
+  } else {
+    await doBookAll(workerUrl, pin);
+  }
+}
+
+function cancelPin() {
+  document.getElementById('pin-overlay').classList.remove('active');
+  pendingBookAction = null;
+}
+
+async function doBook(workerUrl, pin, classIndex) {
+  const statusEl = document.getElementById('status-' + classIndex);
+  const btn = document.querySelector(`#card-${classIndex} .book-btn`);
+  statusEl.className = 'class-status loading';
+  statusEl.textContent = 'booking...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${workerUrl}/book`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, classIndex }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      statusEl.className = 'class-status success';
+      statusEl.textContent = data.message;
+    } else if (data.full) {
+      statusEl.className = 'class-status error';
+      statusEl.textContent = data.message;
+    } else {
+      statusEl.className = 'class-status error';
+      statusEl.textContent = data.error || data.message || 'Something went wrong';
+    }
+  } catch (e) {
+    statusEl.className = 'class-status error';
+    statusEl.textContent = 'Could not reach worker — check URL';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function doBookAll(workerUrl, pin) {
+  const classes = JSON.parse(localStorage.getItem(CLASSES_KEY) || '[]');
+  for (let i = 0; i < classes.length; i++) {
+    await doBook(workerUrl, pin, i);
+    await new Promise(r => setTimeout(r, 500));
+  }
+}
+
+// ── Settings — class rows ────────────────────────────
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+function addClassRow(cls = null) {
+  const manager = document.getElementById('classes-manager');
+  const id = Date.now();
+  const row = document.createElement('div');
+  row.className = 'class-row';
+  row.dataset.id = id;
+  row.innerHTML = `
+    <select class="cls-day">
+      ${DAYS.map(d => `<option ${cls?.day===d?'selected':''}>${d}</option>`).join('')}
+    </select>
+    <input class="cls-start" type="text" placeholder="6:00 AM" value="${cls?.startTime||''}">
+    <input class="cls-end"   type="text" placeholder="7:00 AM" value="${cls?.endTime||''}">
+    <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+  `;
+  manager.appendChild(row);
+}
+
+// ── Save config ──────────────────────────────────────
+async function saveConfig() {
+  const workerUrl = document.getElementById('worker-url').value.trim();
+  const email    = document.getElementById('cred-email').value.trim();
+  const password = document.getElementById('cred-password').value;
+  const pin      = document.getElementById('cred-pin').value.trim();
+  const msgEl    = document.getElementById('save-msg');
+
+  if (!workerUrl) { showMsg('Worker URL is required', true); return; }
+
+  // Collect classes
+  const rows = document.querySelectorAll('.class-row');
+  const classes = [];
+  rows.forEach(row => {
+    const day   = row.querySelector('.cls-day').value;
+    const start = row.querySelector('.cls-start').value.trim();
+    const end   = row.querySelector('.cls-end').value.trim();
+    if (day && start) classes.push({ day, startTime: start, endTime: end || '' });
+  });
+
+  // Always save worker URL and classes locally
+  localStorage.setItem(WORKER_URL_KEY, workerUrl);
+  localStorage.setItem(CLASSES_KEY, JSON.stringify(classes));
+
+  // If credentials provided, save to Cloudflare
+  if (email && password && pin) {
+    try {
+      const res = await fetch(`${workerUrl}/save-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, classes, pin }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showMsg('✓ Saved to Cloudflare', false);
+      } else {
+        showMsg(data.error || 'Cloudflare save failed', true);
+        return;
+      }
+    } catch(e) {
+      showMsg('Could not reach worker — check URL', true);
+      return;
+    }
+  } else {
+    showMsg('✓ Classes saved locally', false);
+  }
+
+  renderClasses();
+}
+
+function showMsg(msg, isErr) {
+  const el = document.getElementById('save-msg');
+  el.textContent = msg;
+  el.className = 'save-msg ' + (isErr ? 'err' : 'ok');
+  setTimeout(() => { el.textContent = ''; el.className = 'save-msg'; }, 4000);
+}
+
+// ── Service Worker (PWA offline) ─────────────────────
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+</script>
+</body>
+</html>
